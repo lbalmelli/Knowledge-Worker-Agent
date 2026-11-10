@@ -912,6 +912,13 @@ func initProviderRegistry() {
 		DiscoverModels: discoverVertexModels,
 	})
 	providers.RegisterBuiltin(providers.Builtin{
+		ID:          opencodeauth.ChatGPTProvider,
+		Label:       "OpenAI / ChatGPT",
+		AuthType:    providers.AuthChatGPTOAuth,
+		Description: "GPT models through your ChatGPT account, using OpenCode's native OAuth sign-in.",
+		CheckAuth:   opencodeauth.ChatGPTAuthenticated,
+	})
+	providers.RegisterBuiltin(providers.Builtin{
 		ID:          opencodeauth.Provider,
 		Label:       "GitHub Copilot",
 		AuthType:    providers.AuthOAuthDevice,
@@ -932,6 +939,10 @@ func initProviderRegistry() {
 	// A running `opencode serve` keeps the address it started with.
 	providers.SetEndpointChangeHook(chat.ReloadServerAgents)
 	installProviderProbes()
+	opencodeauth.SetOnChatGPTLoginSuccess(func() {
+		providers.Forget(opencodeauth.ChatGPTProvider)
+		go providers.Probe(context.Background(), opencodeauth.ChatGPTProvider)
+	})
 
 	if reg := providers.Resolve(); reg.Mode == providers.ModeFallback {
 		// Central management is on but nothing usable resolved — the flag was
@@ -1159,9 +1170,12 @@ func registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/providers/{id}/key", providers.HandleSetKey)
 	mux.HandleFunc("DELETE /api/providers/{id}/key", providers.HandleRemoveKey)
 
-	// OpenCode (github-copilot provider) sign-in — drives `opencode auth
-	// login --provider github-copilot` over a PTY (device flow). This is the
-	// only sign-in flow; it authenticates opencode's github-copilot provider.
+	// OpenCode provider sign-in. ChatGPT uses OpenCode 2.x's native device-code
+	// OAuth API; GitHub Copilot keeps its existing device flow and TUI fallback.
+	mux.HandleFunc("POST /api/openai/auth/login/start", opencodeauth.HandleChatGPTLoginStart)
+	mux.HandleFunc("GET /api/openai/auth/login/{attemptID}", opencodeauth.HandleChatGPTLoginStatus)
+	mux.HandleFunc("POST /api/openai/auth/login/{attemptID}/cancel", opencodeauth.HandleChatGPTLoginCancel)
+
 	mux.HandleFunc("GET /api/opencode/auth/status", opencodeauth.HandleStatus)
 	mux.HandleFunc("POST /api/opencode/auth/login/start", opencodeauth.HandleLoginStart)
 	mux.HandleFunc("GET /api/opencode/auth/login/info", opencodeauth.HandleLoginInfo)
