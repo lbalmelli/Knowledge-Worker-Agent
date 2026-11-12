@@ -128,14 +128,18 @@ func main() {
 			// Cross-session retrieval: serve the retrieval MCP server on stdio. opencode spawns
 			// this; it must not start the HTTP server or write to stdout.
 			os.Exit(runMCPRecall(os.Args[2:]))
+		case "mcp-pkbrain":
+			// Imported-history retrieval is a separate, on-demand MCP server.
+			os.Exit(runMCPPkBrain(os.Args[2:]))
 		case "migrate":
 			os.Exit(runMigrate(os.Args[2:]))
 		case "-h", "--help", "help":
-			fmt.Println("Usage: knowledge-worker-agent [serve|health|version|mcp-recall|migrate dry-run|on|undo]")
+			fmt.Println("Usage: knowledge-worker-agent [serve|health|version|mcp-recall|mcp-pkbrain|migrate dry-run|on|undo]")
 			fmt.Println("  serve       (default) start the HTTP server")
 			fmt.Println("  health      hit /healthz on the configured host/port and exit 0/1")
 			fmt.Println("  version     print the build commit and exit")
 			fmt.Println("  mcp-recall  serve the cross-session retrieval MCP server on stdio")
+			fmt.Println("  mcp-pkbrain serve the PKBrain imported-history MCP server on stdio")
 			fmt.Println("  migrate dry-run  report what the one-folder migration, or once it has run")
 			fmt.Println("                   its undo, would do, and exit")
 			fmt.Println("  migrate on       carry the migration out, with the server stopped; at startup")
@@ -523,6 +527,7 @@ func bootstrap() {
 	}
 
 	ensureRecallMCP()
+	ensurePKBrainMCP()
 	mcp.WarnMissingCommands(os.Stderr)
 
 	// On opencode 2.x, model discovery has started the server by now, before
